@@ -86,7 +86,8 @@ public:
 		dWtArea(0.0),
 		dWtCentLonDeg(0.0),
 		dWtCentLatDeg(0.0),
-		dSumVars(sSumVarCount)
+		dSumVars(sSumVarCount),
+		dValidAreas(sSumVarCount)
 	{
 		dCorrComp[0] = 0.0;
 		dCorrComp[1] = 0.0;
@@ -158,6 +159,11 @@ public:
 	///		Array of sums associated with blob.
 	///	</summary>
 	std::vector<double> dSumVars;
+
+	///	<summary>
+	///		Array of valid areas associated with sums.
+	///	</summary>
+	std::vector<double> dValidAreas;
 };
 
 ///	<summary>
@@ -814,7 +820,10 @@ try {
 
 				// Add sum variables
 				for (int v = 0; v < vecSumVarIx.size(); v++) {
-					bq.dSumVars[v] += static_cast<double>((*(vecSumVarData[v]))[i]) * grid.m_dArea[i] * EarthRadius * EarthRadius;
+					if (!vecSumVarData[v]->IsFillValueAtIx(i)) {
+						bq.dSumVars[v] += static_cast<double>((*(vecSumVarData[v]))[i]) * grid.m_dArea[i] * EarthRadius * EarthRadius;
+						bq.dValidAreas[v] += grid.m_dArea[i] * EarthRadius * EarthRadius;
+					}
 				}
 			}
 
@@ -1103,6 +1112,7 @@ try {
 					// Sum variables
 					for (int v = 0; v < bq.dSumVars.size(); v++) {
 						fprintf(fpout,"\t%1.6e", bq.dSumVars[v]);
+						fprintf(fpout,"\t%1.6e", bq.dSumVars[v] / bq.dValidAreas[v]);
 					}
 
 					// Times
