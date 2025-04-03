@@ -74,7 +74,8 @@ public:
 	///		Constructor.
 	///	</summary>
 	BlobQuantities(
-		size_t sSumVarCount
+		size_t sSumVarCount,
+		size_t sOverlapVarCount
 	) :
 		dAreaX(0.0),
 		dAreaY(0.0),
@@ -86,7 +87,9 @@ public:
 		dWtArea(0.0),
 		dWtCentLonDeg(0.0),
 		dWtCentLatDeg(0.0),
-		dSumVars(sSumVarCount)
+		dSumVars(sSumVarCount),
+		dValidAreas(sSumVarCount),
+		dOverlapVars(sOverlapVarCount)
 	{
 		dCorrComp[0] = 0.0;
 		dCorrComp[1] = 0.0;
@@ -158,6 +161,16 @@ public:
 	///		Array of sums associated with blob.
 	///	</summary>
 	std::vector<double> dSumVars;
+
+	///	<summary>
+	///		Array of valid areas associated with sums.
+	///	</summary>
+	std::vector<double> dValidAreas;
+
+	///	<summary>
+	///		Array of overlapped blobs.
+	///	</summary>
+	std::vector<std::map<int, float>> dOverlapVars;
 };
 
 ///	<summary>
@@ -208,6 +221,9 @@ try {
 	// Variables to sum over
 	std::string strSumVariables;
 
+	// Variables to find overlapped blobs
+	std::string strOverlapVariables;
+
 	// Variables to use in weighting
 	std::string strWeightVariable;
 
@@ -255,6 +271,7 @@ try {
 		CommandLineString(strOutputFile, "out_file", "");
 		CommandLineString(strInputVariable, "var", "object_id");
 		CommandLineString(strSumVariables, "sumvar", "");
+		CommandLineString(strOverlapVariables, "overlapvar", "");
 		CommandLineString(strWeightVariable, "wtvar", "");
 		CommandLineString(strOutputQuantities, "out", "");
 		CommandLineBool(fOutputNodefile, "out_nodefile");
@@ -466,6 +483,29 @@ try {
 		}
 	}
 	_ASSERT(vecSumVarNames.size() == vecSumVarIx.size());
+
+	// Parse --overlapvar argument
+	std::vector<std::string> vecOverlapVarNames;
+	std::vector<VariableIndex> vecOverlapVarIx;
+	if (strOverlapVariables != "") {
+		std::string strOverlapVariablesTemp = strOverlapVariables;
+		for (;;) {
+			VariableIndex varixOverlap;
+			int iLast = varreg.FindOrRegisterSubStr(strOverlapVariablesTemp, &varixOverlap) + 1;
+
+			if (varixOverlap == varixBlobTag) {
+				_EXCEPTIONT("--var and --overlapvar cannot contain the same variables");
+			}
+
+			vecOverlapVarIx.push_back(varixOverlap);
+			vecOverlapVarNames.push_back( strOverlapVariablesTemp.substr(0,iLast-1) );
+			if (iLast >= strOverlapVariablesTemp.length()) {
+				break;
+			}
+			strOverlapVariablesTemp = strOverlapVariablesTemp.substr(iLast);
+		}
+	}
+	_ASSERT(vecOverlapVarNames.size() == vecOverlapVarIx.size());
 
 	// Parse --wtvar argument
 	VariableIndex varixWeight = InvalidVariableIndex;
@@ -720,6 +760,16 @@ try {
 				_ASSERT(dataIndex.GetRows() == grid.GetSize());
 			}
 
+			// Load in all --overlapvar data
+			std::vector< DataArray1D<float> * > vecOverlapVarData;
+			for (int v = 0; v < vecOverlapVarIx.size(); v++) {
+				Variable & varOverlapVar = varreg.Get(vecOverlapVarIx[v]);
+				varOverlapVar.LoadGridData(varreg, vecInFiles, grid);
+				DataArray1D<float> & dataOverlapVar = varOverlapVar.GetData();
+				vecOverlapVarData.push_back(&dataOverlapVar);
+				_ASSERT(dataIndex.GetRows() == grid.GetSize());
+			}
+
 			// Last data index
 			int iLastDataIndex = 0;
 
@@ -772,7 +822,7 @@ try {
 							mapTimedBlobQuantities.insert(
 								TimedBlobQuantitiesMap::value_type(
 									iTime,
-									BlobQuantities(vecSumVarIx.size())));
+									BlobQuantities(vecSumVarIx.size(), vecOverlapVarIx.size())));
 
 						if (pr.second == false) {
 							_EXCEPTIONT("Map insertion failed");
@@ -814,7 +864,21 @@ try {
 
 				// Add sum variables
 				for (int v = 0; v < vecSumVarIx.size(); v++) {
-					bq.dSumVars[v] += static_cast<double>((*(vecSumVarData[v]))[i]) * grid.m_dArea[i] * EarthRadius * EarthRadius;
+					if (!vecSumVarData[v]->IsFillValueAtIx(i)) {
+						bq.dSumVars[v] += static_cast<double>((*(vecSumVarData[v]))[i]) * grid.m_dArea[i] * EarthRadius * EarthRadius;
+						bq.dValidAreas[v] += grid.m_dArea[i];
+					}
+				}
+
+				// Find overlapped variables
+				for (int v = 0; v < vecOverlapVarIx.size(); v++) {
+					int val = static_cast<int>((*(vecOverlapVarData[v]))[i]);
+					if (bq.dOverlapVars[v].find(val) == bq.dOverlapVars[v].end()) {
+						bq.dOverlapVars[v][val] = 0;
+					} else {
+						bq.dOverlapVars[v][val] += 
+							grid.m_dArea[i];
+					}
 				}
 			}
 
@@ -1103,6 +1167,20 @@ try {
 					// Sum variables
 					for (int v = 0; v < bq.dSumVars.size(); v++) {
 						fprintf(fpout,"\t%1.6e", bq.dSumVars[v]);
+						fprintf(fpout,"\t%1.6e", bq.dSumVars[v] / 
+											(bq.dValidAreas[v]  * EarthRadius * EarthRadius));
+					}
+
+					// Overlapped variables
+					for (int v = 0; v < bq.dOverlapVars.size(); v++) {
+						fprintf(fpout, "\t");
+						for (auto iter = bq.dOverlapVars[v].begin();
+									iter != bq.dOverlapVars[v].end();
+									iter++) {
+							fprintf(
+									fpout, "%i:%.1f;", iter->first,
+									iter->second / bq.dArea * 100.0);
+						}
 					}
 
 					// Times
