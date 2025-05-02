@@ -118,6 +118,12 @@ DataOp * DataOpManager::Add(
 	} else if (strName == "_F") {
 		return Add(new DataOp_F);
 
+	} else if (strName == "_ANGLETOVECX") {
+		return Add(new DataOp_ANGLETOVECX);
+
+	} else if (strName == "_ANGLETOVECY") {
+		return Add(new DataOp_ANGLETOVECY);
+
 	// Laplacian operator
 	} else if (strName.substr(0,10) == "_LAPLACIAN") {
 		int nPoints = 0;
@@ -2825,6 +2831,154 @@ bool DataOp_MEAN::Apply(
 	}
 
 	m_opMean.Apply(*(vecArgData[0]), dataout, true);
+
+	return true;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// DataOp_ANGLETOVECX
+///////////////////////////////////////////////////////////////////////////////
+
+const char * DataOp_ANGLETOVECX::name = "_ANGLETOVECX";
+
+///////////////////////////////////////////////////////////////////////////////
+
+bool DataOp_ANGLETOVECX::Apply(
+	const SimpleGrid & grid,
+	const std::vector<std::string> & strArg,
+	const std::vector<DataArray1D<float> const *> & vecArgData,
+	DataArray1D<float> & dataout
+) {
+	if (strArg.size() != 2) {
+		_EXCEPTION2("%s expects two arguments: %i given",
+			m_strName.c_str(), strArg.size());
+	}
+	
+	for (int v = 0; v < vecArgData.size(); v++) {
+		if (vecArgData[v] == NULL) {
+			if (!STLStringHelper::IsFloat(strArg[v])) {
+				_EXCEPTION1("Arguments to %s must be data variables or floats",
+					m_strName.c_str());
+			}
+		}
+	}
+
+	if (vecArgData[0] == NULL) {
+		if (!STLStringHelper::IsFloat(strArg[0])) {
+			_EXCEPTION1("Arguments to %s must be data variables or floats",
+				m_strName.c_str());
+		}
+	}
+	if (vecArgData[1] == NULL) {
+		if (!STLStringHelper::IsFloat(strArg[1])) {
+			_EXCEPTION1("Arguments to %s must be data variables or floats",
+				m_strName.c_str());
+		}
+	}
+
+	if (vecArgData[0] == NULL & vecArgData[1] != NULL) {
+		float dValue = atof(strArg[0].c_str());
+		const DataArray1D<float> & data = *(vecArgData[1]);
+		for (int i = 0; i < dataout.GetRows(); i++) {
+			dataout[i] = - abs(data[i]) * sin(DegToRad(dValue));
+		}
+
+	} else if (vecArgData[1] == NULL & vecArgData[0] != NULL) {
+		const DataArray1D<float> & data = *(vecArgData[0]);
+		float dValue = atof(strArg[1].c_str());
+		for (int i = 0; i < dataout.GetRows(); i++) {
+			dataout[i] = - abs(dValue) * sin(DegToRad(data[i]));
+		}
+	
+	} else if (vecArgData[0] == NULL & vecArgData[1] == NULL) {
+		float dValueLeft = atof(strArg[0].c_str());
+		float dValueRight = atof(strArg[1].c_str());
+		for (int i = 0; i < dataout.GetRows(); i++) {
+			dataout[i] = - abs(dValueLeft) * sin(DegToRad(dValueRight));
+		}
+
+	} else {
+		const DataArray1D<float> & dataLeft  = *(vecArgData[0]);
+		const DataArray1D<float> & dataRight = *(vecArgData[1]);
+
+		for (int i = 0; i < dataout.GetRows(); i++) {
+			dataout[i] = - abs(dataRight[i]) * sin(DegToRad(dataLeft[i]));
+		}
+	}
+
+	return true;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// DataOp_ANGLETOVECX
+///////////////////////////////////////////////////////////////////////////////
+
+const char * DataOp_ANGLETOVECY::name = "_ANGLETOVECY";
+
+///////////////////////////////////////////////////////////////////////////////
+
+bool DataOp_ANGLETOVECY::Apply(
+	const SimpleGrid & grid,
+	const std::vector<std::string> & strArg,
+	const std::vector<DataArray1D<float> const *> & vecArgData,
+	DataArray1D<float> & dataout
+) {
+	if (strArg.size() != 2) {
+		_EXCEPTION2("%s expects two arguments: %i given",
+			m_strName.c_str(), strArg.size());
+	}
+	
+	for (int v = 0; v < vecArgData.size(); v++) {
+		if (vecArgData[v] == NULL) {
+			if (!STLStringHelper::IsFloat(strArg[v])) {
+				_EXCEPTION1("Arguments to %s must be data variables or floats",
+					m_strName.c_str());
+			}
+		}
+	}
+
+	if (vecArgData[0] == NULL) {
+		if (!STLStringHelper::IsFloat(strArg[0])) {
+			_EXCEPTION1("Arguments to %s must be data variables or floats",
+				m_strName.c_str());
+		}
+	}
+	if (vecArgData[1] == NULL) {
+		if (!STLStringHelper::IsFloat(strArg[1])) {
+			_EXCEPTION1("Arguments to %s must be data variables or floats",
+				m_strName.c_str());
+		}
+	}
+
+	if (vecArgData[0] == NULL & vecArgData[1] != NULL) {
+		float dValue = atof(strArg[0].c_str());
+		const DataArray1D<float> & data = *(vecArgData[1]);
+		for (int i = 0; i < dataout.GetRows(); i++) {
+			dataout[i] = - abs(data[i]) * cos(DegToRad(dValue));
+		}
+
+	} else if (vecArgData[1] == NULL & vecArgData[0] != NULL) {
+		const DataArray1D<float> & data = *(vecArgData[0]);
+		float dValue = atof(strArg[1].c_str());
+		for (int i = 0; i < dataout.GetRows(); i++) {
+			dataout[i] = - abs(dValue) * cos(DegToRad(data[i]));
+		}
+	
+	} else if (vecArgData[0] == NULL & vecArgData[1] == NULL) {
+		float dValueLeft = atof(strArg[0].c_str());
+		float dValueRight = atof(strArg[1].c_str());
+		for (int i = 0; i < dataout.GetRows(); i++) {
+			dataout[i] = - abs(dValueLeft) * cos(DegToRad(dValueRight));
+		}
+
+	} else {
+		const DataArray1D<float> & dataLeft  = *(vecArgData[0]);
+		const DataArray1D<float> & dataRight = *(vecArgData[1]);
+
+		for (int i = 0; i < dataout.GetRows(); i++) {
+			dataout[i] = - abs(dataRight[i]) * cos(DegToRad(dataLeft[i]));
+		}
+	}
 
 	return true;
 }

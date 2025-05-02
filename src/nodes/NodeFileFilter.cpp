@@ -277,6 +277,343 @@ public:
 
 ///////////////////////////////////////////////////////////////////////////////
 
+///	<summary>
+///		A class storing a nearbyblob operator.
+///	</summary>
+class NearbyBlobsLocVecOp {
+
+public:
+	///	<summary>
+	///		Possible operations.
+	///	</summary>
+	enum Operation {
+		GreaterThan,
+		LessThan,
+		GreaterThanEqualTo,
+		LessThanEqualTo,
+		EqualTo,
+		NotEqualTo
+	};
+
+public:
+	///	<summary>
+	///		Constructor.
+	///	</summary>
+	NearbyBlobsLocVecOp() :
+		m_dDistance(0.0),
+		m_eOp(GreaterThan),
+		m_dValue(0.0),
+		m_dMaxDist(180.0)
+	{ }
+
+public:
+	///	<summary>
+	///		Parse a nearbyblob operator string.
+	///	</summary>
+	void Parse(
+		VariableRegistry & varreg,
+		const std::string & strOp
+	) {
+		// Read mode
+		enum {
+			ReadMode_Distance,
+			ReadMode_Op,
+			ReadMode_Value,
+			ReadMode_MaxDist,
+			ReadMode_Op_Other,
+			ReadMode_Value_Other,
+			ReadMode_Invalid
+		} eReadMode = ReadMode_Distance;
+
+		// Parse variable
+		int iLast = 0;
+		int otherFound = 0;
+		for (int i = 0; i < 10; i++) {
+			VariableIndex varix(InvalidVariableIndex);
+			if (!isdigit(strOp.substr(iLast)[0])) {
+				iLast += varreg.FindOrRegisterSubStr(strOp.substr(iLast), &varix) + 1;
+				if (i > 3) {
+					otherFound ++;
+				}
+			} else {
+				break;
+			}
+			m_varixs.push_back(varix);
+		}
+		std::cout << std::endl;
+		std::cout << strOp.substr(iLast) << std::endl;
+		std::cout << otherFound << std::endl;
+
+		// Loop through string
+		for (int i = iLast; i <= strOp.length(); i++) {
+
+			// Comma-delimited
+			if ((i == strOp.length()) || (strOp[i] == ',')) {
+
+				std::string strSubStr =
+					strOp.substr(iLast, i - iLast);
+
+				// Read in distance
+				if (eReadMode == ReadMode_Distance) {
+					m_dDistance = atof(strSubStr.c_str());
+
+					iLast = i + 1;
+					eReadMode = ReadMode_Op;
+
+				// Read in operation
+				} else if (eReadMode == ReadMode_Op) {
+					if (strSubStr == ">") {
+						m_eOp = GreaterThan;
+					} else if (strSubStr == "<") {
+						m_eOp = LessThan;
+					} else if (strSubStr == ">=") {
+						m_eOp = GreaterThanEqualTo;
+					} else if (strSubStr == "<=") {
+						m_eOp = LessThanEqualTo;
+					} else if (strSubStr == "=") {
+						m_eOp = EqualTo;
+					} else if (strSubStr == "!=") {
+						m_eOp = NotEqualTo;
+					} else {
+						_EXCEPTION1("Threshold invalid operation \"%s\"",
+							strSubStr.c_str());
+					}
+
+					iLast = i + 1;
+					eReadMode = ReadMode_Value;
+
+				// Read in value
+				} else if (eReadMode == ReadMode_Value) {
+					m_dValue = atof(strSubStr.c_str());
+
+					iLast = i + 1;
+					eReadMode = ReadMode_MaxDist;
+
+				// Read in maximum distance
+				} else if (eReadMode == ReadMode_MaxDist) {
+					m_dMaxDist = atof(strSubStr.c_str());
+
+					iLast = i + 1;
+					eReadMode = ReadMode_Invalid;
+					if (otherFound > 0) {
+						eReadMode = ReadMode_Op_Other;
+					}
+				
+				} else if (eReadMode == ReadMode_Op_Other) {
+					Operation tmpOp;
+					if (strSubStr == ">") {
+						tmpOp = GreaterThan;
+					} else if (strSubStr == "<") {
+						tmpOp = LessThan;
+					} else if (strSubStr == ">=") {
+						tmpOp = GreaterThanEqualTo;
+					} else if (strSubStr == "<=") {
+						tmpOp = LessThanEqualTo;
+					} else if (strSubStr == "=") {
+						tmpOp = EqualTo;
+					} else if (strSubStr == "!=") {
+						tmpOp = NotEqualTo;
+					} else {
+						_EXCEPTION1("Threshold invalid operation \"%s\"",
+							strSubStr.c_str());
+					}
+					iLast = i + 1;
+					m_eOp_others.push_back(tmpOp);
+					eReadMode = ReadMode_Value_Other;
+					
+				} else if (eReadMode == ReadMode_Value_Other) {
+					double tmp = atof(strSubStr.c_str());
+					iLast = i + 1;
+					m_dValue_others.push_back(tmp);
+					eReadMode = ReadMode_Invalid;
+					otherFound--;
+					if (otherFound > 0) {
+						eReadMode = ReadMode_Op_Other;
+					}
+
+				// Invalid
+				} else if (eReadMode == ReadMode_Invalid) {
+					_EXCEPTION1("\nInsufficient entries in threshold op \"%s\""
+							"\nRequired: \"<variable>,<distance>,<operation>,<value>[,<max distance>]\"",
+							strOp.c_str());
+				}
+			}
+		}
+
+		if ((eReadMode != ReadMode_Invalid) && (eReadMode != ReadMode_MaxDist)) {
+			_EXCEPTION1("\nInsufficient entries in --nearbyblobs op \"%s\""
+					"\nRequired: \"<name>,<distance>,<operation>,<value>[,<max distance>]\"",
+					strOp.c_str());
+		}
+
+		if (m_dDistance < 0.0) {
+			_EXCEPTION1("For --nearbyblobs, distance (%2.6f) must be nonnegative", m_dDistance);
+		}
+		if (m_dMaxDist < 0.0) {
+			_EXCEPTION1("For --nearbyblobs, max distance (%2.6f) must be nonnegative", m_dMaxDist);
+		}
+		if (m_dDistance > m_dMaxDist) {
+			_EXCEPTION2("For --nearbyblobs, distance (%2.6f) must be less than or equal to max distance (%2.6f)", m_dDistance, m_dMaxDist);
+		}
+		_ASSERT(m_dValue_others.size() == m_eOp_others.size());
+
+		// Output announcement
+		char szBuffer[128];
+
+		snprintf(szBuffer, 128, "%f", m_dDistance);
+		std::string strDescription =
+			std::string("Include blobs with at least 1 point within ") + szBuffer
+			+ std::string(" degrees where the angle using ") 
+			+ varreg.GetVariableString(m_varixs[0]) + "," 
+			+ varreg.GetVariableString(m_varixs[1]) + "," 
+			+ varreg.GetVariableString(m_varixs[2]) + ", and " 
+			+ varreg.GetVariableString(m_varixs[3]);
+		if (m_eOp == GreaterThan) {
+			strDescription += " is greater than ";
+		} else if (m_eOp == LessThan) {
+			strDescription += " is less than ";
+		} else if (m_eOp == GreaterThanEqualTo) {
+			strDescription += " is greater than or equal to ";
+		} else if (m_eOp == LessThanEqualTo) {
+			strDescription += " is less than or equal to ";
+		} else if (m_eOp == EqualTo) {
+			strDescription += " is equal to ";
+		} else if (m_eOp == NotEqualTo) {
+			strDescription += " is not equal to ";
+		}
+
+		if (fabs(m_dValue) < 1.0e-4) {
+			snprintf(szBuffer, 128, "%e", m_dValue);
+		} else {
+			snprintf(szBuffer, 128, "%f", m_dValue);
+		}
+		strDescription += szBuffer;
+
+		snprintf(szBuffer, 128, "%f", m_dMaxDist);
+		strDescription += std::string(" (max dist ") + szBuffer + " degrees)";
+
+		Announce("%s", strDescription.c_str());
+	}
+
+public:
+	///	<summary>
+	///		Determine if a particular value satisfies this threshold.
+	///	</summary>
+	bool SatisfiedBy(
+		double dValue
+	) const {
+		if (m_eOp == GreaterThan) {
+			if (dValue > m_dValue) {
+				return true;
+			}
+
+		} else if (m_eOp == LessThan) {
+			if (dValue < m_dValue) {
+				return true;
+			}
+
+		} else if (m_eOp == GreaterThanEqualTo) {
+			if (dValue >= m_dValue) {
+				return true;
+			}
+
+		} else if (m_eOp == LessThanEqualTo) {
+			if (dValue <= m_dValue) {
+				return true;
+			}
+
+		} else if (m_eOp == EqualTo) {
+			if (dValue == m_dValue) {
+				return true;	
+			}
+
+		} else if (m_eOp == NotEqualTo) {
+			if (dValue != m_dValue) {
+				return true;
+			}
+
+		} else {
+			_EXCEPTIONT("Invalid operation");
+		}
+
+		return false;
+	}
+
+	bool SatisfiedByOthers(
+		std::vector<double> dValues
+	) const {
+		bool result = true;
+		for (int i = 0; i < dValues.size(); i++) {
+			if (m_eOp_others[i] == GreaterThan) {
+				if (!(dValues[i] > m_dValue_others[i])) {
+					result = false;
+				}
+	
+			} else if (m_eOp_others[i] == LessThan) {
+				if (!(dValues[i] < m_dValue_others[i])) {
+					result = false;
+				}
+	
+			} else if (m_eOp_others[i] == GreaterThanEqualTo) {
+				if (!(dValues[i] >= m_dValue_others[i])) {
+					result = false;
+				}
+	
+			} else if (m_eOp_others[i] == LessThanEqualTo) {
+				if (!(dValues[i] <= m_dValue_others[i])) {
+					result = false;
+				}
+	
+			} else if (m_eOp_others[i] == EqualTo) {
+				if (!(dValues[i] == m_dValue_others[i])) {
+					result = false;
+				}
+	
+			} else if (m_eOp_others[i] == NotEqualTo) {
+				if (!(dValues[i] != m_dValue_others[i])) {
+					result = false;
+				}
+	
+			} else {
+				_EXCEPTIONT("Invalid operation");
+			}
+		}
+
+		return result;
+	}
+
+public:
+	///	<summary>
+	///		Variable to use for nearbyblobs.
+	///	</summary>
+	std::vector<VariableIndex> m_varixs;
+
+	///	<summary>
+	///		Distance to search for blob.
+	///	</summary>
+	double m_dDistance;
+
+	///	<summary>
+	///		Operation.
+	///	</summary>
+	Operation m_eOp;
+
+	///	<summary>
+	///		Threshold value.
+	///	</summary>
+	double m_dValue;
+
+	///	<summary>
+	///		Maximum distance.
+	///	</summary>
+	double m_dMaxDist;
+
+	std::vector<Operation> m_eOp_others;
+	std::vector<double> m_dValue_others;
+};
+
+///////////////////////////////////////////////////////////////////////////////
+	
 void BuildMask_ByDist(
 	const SimpleGrid & grid,
 	const NodeFile & nodefile,
@@ -439,24 +776,29 @@ void BuildMask_ByContour(
 ///////////////////////////////////////////////////////////////////////////////
 
 template <typename real>
-void BuildMask_NearbyBlobs(
+void BuildMask_NearbyBlobsLocVec(
 	const SimpleGrid & grid,
-	const DataArray1D<real> & dataState,
+	const std::vector<DataArray1D<real>> & dataStates,
 	std::vector<double> & vecLonRad,
 	std::vector<double> & vecLatRad,
-	const NearbyBlobsOp & nearbyblobsop,
+	const NearbyBlobsLocVecOp & nearbyblobsop,
 	DataArray1D<double> & dataMask
 ) {
 	// Get the variable
-	const double dDist = nearbyblobsop.m_dDistance;
-	const double dMaxDist = nearbyblobsop.m_dMaxDist;
+	const double dDistDeg = nearbyblobsop.m_dDistance;
+	const double dMaxDistDeg = nearbyblobsop.m_dMaxDist;
 
 	_ASSERT(vecLonRad.size() == vecLatRad.size());
-	_ASSERT(dataState.GetRows() == grid.GetSize());
-	_ASSERT(dDist >= 0.0);
-	_ASSERT(dDist <= 180.0);
-	_ASSERT(dMaxDist >= dDist);
-	_ASSERT(dMaxDist <= 180.0);
+	for (int i = 0; i < dataStates.size(); i++) {
+		_ASSERT(dataStates[i].GetRows() == grid.GetSize());
+	}
+	_ASSERT(dDistDeg >= 0.0);
+	_ASSERT(dDistDeg <= 180.0);
+	_ASSERT(dMaxDistDeg >= dDistDeg);
+	_ASSERT(dMaxDistDeg <= 180.0);
+
+	const double dDistRad = DegToRad(dDistDeg);
+	const double dMaxDistRad = DegToRad(dMaxDistDeg);
 
 	// Loop through all PathNodes
 	for (int j = 0; j < vecLonRad.size(); j++) {
@@ -495,7 +837,177 @@ void BuildMask_NearbyBlobs(
 					grid.m_dLon[ix], grid.m_dLat[ix]);
 
 			// Check if we have exceeded the maximum distance to find blobs
-			if ((ix != ix0) && (dR > dDist)) {
+			if ((ix != ix0) && (dR > dDistRad)) {
+				continue;
+			}
+
+			// Add all neighbors of this point
+			for (int n = 0; n < grid.m_vecConnectivity[ix].size(); n++) {
+				queueNodes.push(grid.m_vecConnectivity[ix][n]);
+			}
+
+			// Check if this point satisfies the nearbyblobs criteria
+			double vec1x = 0;
+			double vec1y = 0;
+			GreatCircleDirection_Rad(
+				DegToRad(dataStates[0][ix]), DegToRad(dataStates[1][ix]),
+				dLon0, dLat0, 
+				vec1x, vec1y);
+			auto vec2x = dataStates[2][ix];
+			auto vec2y = dataStates[3][ix];
+			auto cosAngle = (vec1x * vec2x + vec1y * vec2y)
+				/ (sqrt(vec1x * vec1x + vec1y * vec1y) * sqrt(vec2x * vec2x + vec2y * vec2y));
+
+			auto angle = acos(cosAngle) / M_PI * 180.0;
+			std::vector<double> others;
+			if (dataStates.size() > 4) {
+				for (int i = 4; i < dataStates.size(); i++) {
+					others.push_back(dataStates[i][ix]);
+				}
+			}
+			if (!nearbyblobsop.SatisfiedBy(static_cast<double>(angle)) || !nearbyblobsop.SatisfiedByOthers(others)) {
+				continue;
+			}
+
+			// Tag this point
+			dataMask[ix] = 1.0;
+
+			// Operator satisfied; add all points in this blob to mask up to maxdist
+			std::queue<int> queueThresholdedNodes;
+			queueThresholdedNodes.push(ix);
+
+			std::set<int> setThresholdNodesVisited;
+
+			while (queueThresholdedNodes.size() != 0) {
+				int ixblob = queueThresholdedNodes.front();
+				queueThresholdedNodes.pop();
+
+				if (setThresholdNodesVisited.find(ixblob) !=
+				    setThresholdNodesVisited.end()
+				) {
+					continue;
+				}
+
+				setThresholdNodesVisited.insert(ixblob);
+
+				// Make sure great circle distance to this dof is closer than dMaxDist
+				_ASSERT((ixblob >= 0) && (ixblob < grid.GetSize()));
+
+				double dRblob =
+					GreatCircleDistance_Rad(
+						dLon0, dLat0,
+						grid.m_dLon[ixblob], grid.m_dLat[ixblob]);
+
+				if ((ix != ixblob) && (dRblob > dMaxDistRad)) {
+					continue;
+				}
+
+				// Verify this point satisfies the condition
+				double vec1x = 0;
+				double vec1y = 0;
+				GreatCircleDirection_Rad(
+					DegToRad(dataStates[0][ixblob]), DegToRad(dataStates[1][ixblob]), 
+					dLon0, dLat0, 
+					vec1x, vec1y);
+				auto vec2x = dataStates[2][ixblob];
+				auto vec2y = dataStates[3][ixblob];
+				auto cosAngle = (vec1x * vec2x + vec1y * vec2y) 
+					/ (sqrt(vec1x * vec1x + vec1y * vec1y) * sqrt(vec2x * vec2x + vec2y * vec2y));
+				auto angle = acos(cosAngle) / M_PI * 180.0;
+				std::vector<double> others;
+				if (dataStates.size() > 4) {
+					for (int i = 4; i < dataStates.size(); i++) {
+						others.push_back(dataStates[i][ixblob]);
+					}
+				}
+				if (!nearbyblobsop.SatisfiedBy(static_cast<double>(angle)) || !nearbyblobsop.SatisfiedByOthers(others)) {
+
+					// Isn't part of the blob, but add it to the list of
+					// nodes to visit.
+					if (dRblob <= dDistRad) {
+						queueNodes.push(ixblob);
+					}
+					continue;
+				}
+
+				// Add this point to the set of visited points to avoid it
+				// again triggering a blob search.
+				setNodesVisited.insert(ixblob);
+
+				// Add all neighbors of this point to search
+				for (int n = 0; n < grid.m_vecConnectivity[ixblob].size(); n++) {
+					queueThresholdedNodes.push(grid.m_vecConnectivity[ixblob][n]);
+				}
+
+				dataMask[ixblob] = 1.0;
+			}
+		}
+	}
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+template <typename real>
+void BuildMask_NearbyBlobs(
+	const SimpleGrid & grid,
+	const DataArray1D<real> & dataState,
+	std::vector<double> & vecLonRad,
+	std::vector<double> & vecLatRad,
+	const NearbyBlobsOp & nearbyblobsop,
+	DataArray1D<double> & dataMask
+) {
+	// Get the variable
+	const double dDistDeg = nearbyblobsop.m_dDistance;
+	const double dMaxDistDeg = nearbyblobsop.m_dMaxDist;
+
+	_ASSERT(vecLonRad.size() == vecLatRad.size());
+	_ASSERT(dataState.GetRows() == grid.GetSize());
+	_ASSERT(dDistDeg >= 0.0);
+	_ASSERT(dDistDeg <= 180.0);
+	_ASSERT(dMaxDistDeg >= dDistDeg);
+	_ASSERT(dMaxDistDeg <= 180.0);
+
+	const double dDistRad = DegToRad(dDistDeg);
+	const double dMaxDistRad = DegToRad(dMaxDistDeg);
+
+	// Loop through all PathNodes
+	for (int j = 0; j < vecLonRad.size(); j++) {
+
+		double dLon0 = vecLonRad[j];
+		double dLat0 = vecLatRad[j];
+
+		int ix0 = static_cast<int>(
+			grid.NearestNode(dLon0, dLat0));
+		_ASSERT((ix0 >= 0) && (ix0 < grid.GetSize()));
+
+		// Queue of nodes that remain to be visited
+		std::queue<int> queueNodes;
+		queueNodes.push(ix0);
+
+		// Set of nodes that have already beenvisited
+		std::set<int> setNodesVisited;
+
+		// Loop through all elements
+		while (queueNodes.size() != 0) {
+			int ix = queueNodes.front();
+			queueNodes.pop();
+
+			if (setNodesVisited.find(ix) != setNodesVisited.end()) {
+				continue;
+			}
+
+			setNodesVisited.insert(ix);
+
+			// Great circle distance to this dof
+			_ASSERT((ix >= 0) && (ix < grid.GetSize()));
+
+			double dR =
+				GreatCircleDistance_Rad(
+					dLon0, dLat0,
+					grid.m_dLon[ix], grid.m_dLat[ix]);
+
+			// Check if we have exceeded the maximum distance to find blobs
+			if ((ix != ix0) && (dR > dDistRad)) {
 				continue;
 			}
 
@@ -534,11 +1046,11 @@ void BuildMask_NearbyBlobs(
 				_ASSERT((ixblob >= 0) && (ixblob < grid.GetSize()));
 
 				double dRblob =
-					GreatCircleDistance_Deg(
+					GreatCircleDistance_Rad(
 						dLon0, dLat0,
 						grid.m_dLon[ixblob], grid.m_dLat[ixblob]);
 
-				if ((ix != ixblob) && (dRblob > dMaxDist)) {
+				if ((ix != ixblob) && (dRblob > dMaxDistRad)) {
 					continue;
 				}
 
@@ -547,7 +1059,7 @@ void BuildMask_NearbyBlobs(
 
 					// Isn't part of the blob, but add it to the list of
 					// nodes to visit.
-					if (dRblob <= dDist) {
+					if (dRblob <= dDistRad) {
 						queueNodes.push(ixblob);
 					}
 					continue;
@@ -585,6 +1097,7 @@ void NodeFileFilter(
 	const std::string & strFilterByDist,
 	const std::vector<ClosedContourOp> & vecClosedContourOp,
 	const std::vector<NearbyBlobsOp> & vecNearbyBlobsOp,
+	const std::vector<NearbyBlobsLocVecOp> & vecNearbyBlobsLocVecOp,
 	bool fInvert,
 	const std::vector<std::string> & vecPreserveVariables,
 	const std::string & strFillValueIn,
@@ -994,6 +1507,27 @@ void NodeFileFilter(
 
 			AnnounceEndBlock("Done");
 		}
+		if (vecNearbyBlobsLocVecOp.size() != 0) {
+			AnnounceStartBlock("Building mask (nearbyblobslocvec)");
+			std::vector<DataArray1D<float>> dataStates;
+			for (int i = 0; i < vecNearbyBlobsLocVecOp[0].m_varixs.size(); i++) {
+				Variable & varOp = varreg.Get(vecNearbyBlobsLocVecOp[0].m_varixs[i]);
+				vecInFiles.SetConstantTimeIx(t);
+				varOp.LoadGridData(varreg, vecInFiles, grid);
+				dataStates.push_back(varOp.GetData());
+				_ASSERT(dataStates[i].GetRows() == grid.GetSize());
+			}
+
+			BuildMask_NearbyBlobsLocVec<float>(
+				grid,
+				dataStates,
+				vecLonRad,
+				vecLatRad,
+				vecNearbyBlobsLocVecOp[0],
+				dataMask);
+
+			AnnounceEndBlock("Done");
+		}
 
 		if (fInvert) {
 			for (int i = 0; i < dataMask.GetRows(); i++) {
@@ -1211,6 +1745,9 @@ try {
 	// Detect nearby blobs
 	std::string strNearbyBlobs;
 
+	// Detect nearby blobs with location vector
+	std::string strNearbyBlobsLocVec;
+
 	// Apply the inverted filter
 	bool fInvert;
 
@@ -1250,6 +1787,7 @@ try {
 		CommandLineStringD(strFilterByDist, "bydist", "", "[dist]");
 		CommandLineStringD(strFilterByContour, "bycontour", "", "[var,delta,dist,minmaxdist]");
 		CommandLineStringD(strNearbyBlobs, "nearbyblobs", "", "[var,dist,op,value[,maxdist]]");
+		CommandLineStringD(strNearbyBlobsLocVec, "nearbyblobslocvec", "", "[lon,lat,vecx,vecy,dist,op,value[,maxdist]]");
 		CommandLineBool(fInvert, "invert");
 
 		CommandLineString(strTimeFilter, "timefilter", "");
@@ -1288,7 +1826,8 @@ try {
 	}
 	if ((strFilterByDist.length() == 0) &&
 		(strFilterByContour.length() == 0) &&
-		(strNearbyBlobs.length() == 0)
+		(strNearbyBlobs.length() == 0) && 
+		(strNearbyBlobsLocVec.length() == 0)
 	) {
 		_EXCEPTIONT("No command (--bydist, --bycontour, or --nearbyblobs) specified");
 	}
@@ -1384,6 +1923,17 @@ try {
 		NearbyBlobsOp op;
 		op.Parse(varreg, strNearbyBlobs);
 		vecNearbyBlobsOp.push_back(op);
+		AnnounceEndBlock(NULL);
+	}
+
+	// Parse --nearbyblobs
+	std::vector<NearbyBlobsLocVecOp> vecNearbyBlobsLocVecOp;
+
+	if (strNearbyBlobsLocVec != "") {
+		AnnounceStartBlock("Parsing --nearbyblobs");
+		NearbyBlobsLocVecOp op;
+		op.Parse(varreg, strNearbyBlobsLocVec);
+		vecNearbyBlobsLocVecOp.push_back(op);
 		AnnounceEndBlock(NULL);
 	}
 
@@ -1580,6 +2130,7 @@ try {
 			strFilterByDist,
 			vecClosedContourOp,
 			vecNearbyBlobsOp,
+			vecNearbyBlobsLocVecOp,
 			fInvert,
 			vecPreserveVariables,
 			strFillValue,

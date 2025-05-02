@@ -45,6 +45,8 @@ VariableRegistry::VariableRegistry() :
 	m_domDataOp.Add("_POW");
 	m_domDataOp.Add("_LAT");
 	m_domDataOp.Add("_F");
+	m_domDataOp.Add("_ANGLETOVECX");
+	m_domDataOp.Add("_ANGLETOVECY");
 }
 
 ///////////////////////////////////////////////////////////////////////////////
