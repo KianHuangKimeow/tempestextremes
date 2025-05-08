@@ -2880,21 +2880,21 @@ bool DataOp_ANGLETOVECX::Apply(
 		float dValue = atof(strArg[0].c_str());
 		const DataArray1D<float> & data = *(vecArgData[1]);
 		for (int i = 0; i < dataout.GetRows(); i++) {
-			dataout[i] = - abs(data[i]) * sin(DegToRad(dValue));
+			dataout[i] = - fabs(data[i]) * sin(DegToRad(dValue));
 		}
 
 	} else if (vecArgData[1] == NULL & vecArgData[0] != NULL) {
 		const DataArray1D<float> & data = *(vecArgData[0]);
 		float dValue = atof(strArg[1].c_str());
 		for (int i = 0; i < dataout.GetRows(); i++) {
-			dataout[i] = - abs(dValue) * sin(DegToRad(data[i]));
+			dataout[i] = - fabs(dValue) * sin(DegToRad(data[i]));
 		}
 	
 	} else if (vecArgData[0] == NULL & vecArgData[1] == NULL) {
 		float dValueLeft = atof(strArg[0].c_str());
 		float dValueRight = atof(strArg[1].c_str());
 		for (int i = 0; i < dataout.GetRows(); i++) {
-			dataout[i] = - abs(dValueLeft) * sin(DegToRad(dValueRight));
+			dataout[i] = - fabs(dValueLeft) * sin(DegToRad(dValueRight));
 		}
 
 	} else {
@@ -2902,7 +2902,7 @@ bool DataOp_ANGLETOVECX::Apply(
 		const DataArray1D<float> & dataRight = *(vecArgData[1]);
 
 		for (int i = 0; i < dataout.GetRows(); i++) {
-			dataout[i] = - abs(dataRight[i]) * sin(DegToRad(dataLeft[i]));
+			dataout[i] = - fabs(dataRight[i]) * sin(DegToRad(dataLeft[i]));
 		}
 	}
 
@@ -2954,21 +2954,21 @@ bool DataOp_ANGLETOVECY::Apply(
 		float dValue = atof(strArg[0].c_str());
 		const DataArray1D<float> & data = *(vecArgData[1]);
 		for (int i = 0; i < dataout.GetRows(); i++) {
-			dataout[i] = - abs(data[i]) * cos(DegToRad(dValue));
+			dataout[i] = - fabs(data[i]) * cos(DegToRad(dValue));
 		}
 
 	} else if (vecArgData[1] == NULL & vecArgData[0] != NULL) {
 		const DataArray1D<float> & data = *(vecArgData[0]);
 		float dValue = atof(strArg[1].c_str());
 		for (int i = 0; i < dataout.GetRows(); i++) {
-			dataout[i] = - abs(dValue) * cos(DegToRad(data[i]));
+			dataout[i] = - fabs(dValue) * cos(DegToRad(data[i]));
 		}
 	
 	} else if (vecArgData[0] == NULL & vecArgData[1] == NULL) {
 		float dValueLeft = atof(strArg[0].c_str());
 		float dValueRight = atof(strArg[1].c_str());
 		for (int i = 0; i < dataout.GetRows(); i++) {
-			dataout[i] = - abs(dValueLeft) * cos(DegToRad(dValueRight));
+			dataout[i] = - fabs(dValueLeft) * cos(DegToRad(dValueRight));
 		}
 
 	} else {
@@ -2976,7 +2976,7 @@ bool DataOp_ANGLETOVECY::Apply(
 		const DataArray1D<float> & dataRight = *(vecArgData[1]);
 
 		for (int i = 0; i < dataout.GetRows(); i++) {
-			dataout[i] = - abs(dataRight[i]) * cos(DegToRad(dataLeft[i]));
+			dataout[i] = - fabs(dataRight[i]) * cos(DegToRad(dataLeft[i]));
 		}
 	}
 
