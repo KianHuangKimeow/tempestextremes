@@ -23,11 +23,13 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 bool Time::operator==(const Time & time) const {
-	if ((m_eCalendarType != time.m_eCalendarType) ||
-	    (m_eTimeType     != time.m_eTimeType)     ||
-	    (m_iYear        != time.m_iYear)          ||
-	    (m_iMonth       != time.m_iMonth)         ||
-	    (m_iDay         != time.m_iDay)           ||
+	if (!((m_eCalendarType == time.m_eCalendarType) ||
+			  (((m_eCalendarType == CalendarStandard) || (m_eCalendarType == CalendarGregorian)) && 
+			   ((time.m_eCalendarType == CalendarStandard) || (time.m_eCalendarType == CalendarGregorian)))) ||
+		(m_eTimeType     != time.m_eTimeType)     ||
+		(m_iYear        != time.m_iYear)          ||
+	  (m_iMonth       != time.m_iMonth)         ||
+	  (m_iDay         != time.m_iDay)           ||
 		(m_iSecond      != time.m_iSecond)        ||
 		(m_iMicroSecond != time.m_iMicroSecond)
 	) {
