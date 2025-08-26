@@ -659,8 +659,8 @@ try {
 
 			Announce("Time %s", vecFileTimes[t].ToString().c_str());
 
-			// Set the time index
-			vecInFiles.SetConstantTimeIx(t);
+			// Set the time
+			vecInFiles.SetTime(vecFileTimes[t]);
 
 			// Load in the data
 			varBlobTag.LoadGridData(varreg, vecInFiles, grid);
